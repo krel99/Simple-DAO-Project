@@ -30,6 +30,7 @@ contract Governance {
     }
 
     mapping(bytes32 => Proposal) public proposals;
+    bytes32[] public proposalIds;
 
     // sets the governance token
     constructor(address _governanceToken) {
@@ -97,6 +98,7 @@ contract Governance {
         );
 
         Proposal storage proposal = proposals[proposalId];
+        proposalIds.push(proposalId);
 
         // sets the proposal details
         proposal.creator = msg.sender;
@@ -190,6 +192,113 @@ contract Governance {
                 ProposalStatus.YES
             );
         }
+    }
+
+
+    // view functions
+    // these don't affect functionality or state
+
+    // ? can this be written in a better way?
+    function getProposal(bytes32 proposalId) public view returns (
+        address creator,
+        uint256 totalVotesYes,
+        uint256 totalVotesNo,
+        uint256 totalWeightYes,
+        uint256 totalWeightNo,
+        uint64 minimumVotes,
+        uint64 minimumWeight,
+        uint16 majorityRequiredToPass,
+        uint256 deadline,
+        string memory proposalQuestion,
+        string memory proposalDescription,
+        uint256 totalWeight,
+        uint256 totalVotes
+    ) {
+        Proposal storage proposal = proposals[proposalId];
+        return (
+            proposal.creator,
+            proposal.totalVotesYes,
+            proposal.totalVotesNo,
+            proposal.totalWeightYes,
+            proposal.totalWeightNo,
+            proposal.minimumVotes,
+            proposal.minimumWeight,
+            proposal.majorityRequiredToPass,
+            proposal.deadline,
+            proposal.proposalQuestion,
+            proposal.proposalDescription,
+            proposal.totalWeight,
+            proposal.totalVotes
+        );
+    }
+
+    function getProposalStatus(bytes32 proposalId) public view returns (ProposalStatus) {
+        Proposal storage proposal = proposals[proposalId];
+        
+        bool beatsMinimumVotes = proposal.minimumVotes <= (proposal.totalVotesYes + proposal.totalVotesNo);
+        bool beatsMinimumWeight = proposal.minimumWeight <= (proposal.totalWeightYes + proposal.totalWeightNo);
+        
+        if (!beatsMinimumVotes || !beatsMinimumWeight) {
+            return ProposalStatus.InsufficientVotersInterest;
+        }
+        
+        uint256 totalWeight = proposal.totalWeightYes + proposal.totalWeightNo;
+        if (totalWeight > 0) {
+            uint256 yesPercentage = (proposal.totalWeightYes * 100) / totalWeight;
+            return yesPercentage >= proposal.majorityRequiredToPass ? ProposalStatus.YES : ProposalStatus.NO;
+        }
+        
+        return ProposalStatus.NO;
+    }
+
+    function hasVoted(bytes32 proposalId, address voter) public view returns (bool) {
+        return proposals[proposalId].votes[voter] > 0;
+    }
+
+    function getVoteWeight(bytes32 proposalId, address voter) public view returns (uint256) {
+        return proposals[proposalId].votes[voter];
+    }
+
+    function getRemainingTime(bytes32 proposalId) public view returns (uint256) {
+        return proposals[proposalId].deadline - block.timestamp;
+    }
+
+    function getActiveProposals() public view returns (bytes32[] memory) {
+        uint256 activeCount = 0;
+        for (uint256 i = 0; i < proposalIds.length; i++) {
+            if (proposals[proposalIds[i]].deadline > block.timestamp) {
+                activeCount++;
+            }
+        }
+        
+        bytes32[] memory activeProposals = new bytes32[](activeCount);
+        uint256 count = 0;
+        for (uint256 i = 0; i < proposalIds.length; i++) {
+            if (proposals[proposalIds[i]].deadline > block.timestamp) {
+                activeProposals[count] = proposalIds[i];
+                count++;
+            }
+        }
+        return activeProposals;
+    }
+
+    function getProposalsByCreator(address creator) public view returns (bytes32[] memory) {
+        uint256 count = 0;
+        for (uint256 i = 0; i < proposalIds.length; i++) {
+            if (proposals[proposalIds[i]].creator == creator) {
+                count++;
+            }
+        }
+        
+        bytes32[] memory creatorProposals = new bytes32[](count);
+        uint256 index = 0;
+        for (uint256 i = 0; i < proposalIds.length; i++) {
+            if (proposals[proposalIds[i]].creator == creator) {
+                creatorProposals[index] = proposalIds[i];
+                index++;
+            }
+        }
+        return creatorProposals;
     }
 }
 
