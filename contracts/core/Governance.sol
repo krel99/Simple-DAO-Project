@@ -199,38 +199,38 @@ contract Governance {
     // these don't affect functionality or state
 
     // ? can this be written in a better way?
-    function getProposal(bytes32 proposalId) public view returns (
-        address creator,
-        uint256 totalVotesYes,
-        uint256 totalVotesNo,
-        uint256 totalWeightYes,
-        uint256 totalWeightNo,
-        uint64 minimumVotes,
-        uint64 minimumWeight,
-        uint16 majorityRequiredToPass,
-        uint256 deadline,
-        string memory proposalQuestion,
-        string memory proposalDescription,
-        uint256 totalWeight,
-        uint256 totalVotes
-    ) {
-        Proposal storage proposal = proposals[proposalId];
-        return (
-            proposal.creator,
-            proposal.totalVotesYes,
-            proposal.totalVotesNo,
-            proposal.totalWeightYes,
-            proposal.totalWeightNo,
-            proposal.minimumVotes,
-            proposal.minimumWeight,
-            proposal.majorityRequiredToPass,
-            proposal.deadline,
-            proposal.proposalQuestion,
-            proposal.proposalDescription,
-            proposal.totalWeight,
-            proposal.totalVotes
-        );
-    }
+    // function getProposal(bytes32 proposalId) public view returns (
+    //     address creator,
+    //     uint256 totalVotesYes,
+    //     uint256 totalVotesNo,
+    //     uint256 totalWeightYes,
+    //     uint256 totalWeightNo,
+    //     uint64 minimumVotes,
+    //     uint64 minimumWeight,
+    //     uint16 majorityRequiredToPass,
+    //     uint256 deadline,
+    //     string memory proposalQuestion,
+    //     string memory proposalDescription,
+    //     uint256 totalWeight,
+    //     uint256 totalVotes
+    // ) {
+    //     Proposal storage proposal = proposals[proposalId];
+    //     return (
+    //         proposal.creator,
+    //         proposal.totalVotesYes,
+    //         proposal.totalVotesNo,
+    //         proposal.totalWeightYes,
+    //         proposal.totalWeightNo,
+    //         proposal.minimumVotes,
+    //         proposal.minimumWeight,
+    //         proposal.majorityRequiredToPass,
+    //         proposal.deadline,
+    //         proposal.proposalQuestion,
+    //         proposal.proposalDescription,
+    //         proposal.totalWeight,
+    //         proposal.totalVotes
+    //     );
+    // }
 
     function getProposalStatus(bytes32 proposalId) public view returns (ProposalStatus) {
         Proposal storage proposal = proposals[proposalId];
