@@ -1,9 +1,11 @@
 //SPDX-License-Identifier: free
-pragma solidity 0.8.7;
+pragma solidity 0.8.30;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 contract Governance {
+    address public governanceToken;
+
     struct Proposal {
         address creator;
         uint256 totalVotesYes;
@@ -16,6 +18,8 @@ contract Governance {
         uint256 deadline;
         string proposalQuestion;
         string proposalDescription;
+        uint256 totalWeight;
+        uint256 totalVotes;
         mapping(address => uint256) votes;
     }
 
@@ -27,7 +31,12 @@ contract Governance {
 
     mapping(bytes32 => Proposal) public proposals;
 
-    event VoteCast(msg.sender, proposalId, support, weight);
+    // sets the governance token
+    constructor(address _governanceToken) {
+        governanceToken = _governanceToken;
+    }
+
+    event VoteCast(address indexed voter, bytes32 indexed proposalId, bool support, uint256 weight);
     event VoteEnded(
         bytes32 indexed proposalId,
         uint256 totalVotesYes,
@@ -44,58 +53,24 @@ contract Governance {
         );
         _;
     }
-    modifier didntVoteBefore(address voter) {
-        require(votes[voter] == 0, "Already voted");
-        _;
+    modifier didntVoteBefore(bytes32 proposalId, address voter) { 
+        require(proposals[proposalId].votes[voter] == 0, "Already voted"); 
+        _; 
     }
-    modifier proposalVotingIsActive() {
+    modifier proposalVotingIsActive(bytes32 proposalId) {
         require(
-            proposal.deadline > block.timestamp,
+            proposals[proposalId].deadline > block.timestamp,
             "Proposal voting is active"
         );
         _;
     }
-    modifier proposalVotingIsEnded() {
+    modifier proposalVotingIsEnded(bytes32 proposalId) {
         require(
-            proposal.deadline < block.timestamp,
+            proposals[proposalId].deadline < block.timestamp,
             "Proposal voting has ended"
         );
         _;
     }
-
-    // modifier surpassedMinimumVoteCount() {
-    //     require(
-    //         proposal.minimumVotes <=
-    //             (proposal.totalVotesYes + proposal.totalVotesNo),
-    //         "Proposal voting has ended"
-    //     );
-    //     _;
-    // }
-    // modifier surpassedMinimumVoteWeight() {
-    //     require(
-    //         proposal.minimumWeight <=
-    //             (proposal.totalWeightYes + proposal.totalWeightNo),
-    //         "Proposal voting has ended"
-    //     );
-    //     _;
-    // }
-
-    // modifier didntSurpassMinimumVoteCount() {
-    //     require(
-    //         proposal.minimumVotes >
-    //             (proposal.totalVotesYes + proposal.totalVotesNo),
-    //         "Proposal voting has ended"
-    //     );
-    //     _;
-    // }
-    // modifier didntSurpassMinimumVoteWeight() {
-    //     require(
-    //         proposal.minimumWeight >
-    //             (proposal.totalWeightYes + proposal.totalWeightNo),
-    //         "Proposal voting has ended"
-    //     );
-    //     _;
-    // }
 
     function propose(
         bytes32 proposalId,
@@ -122,6 +97,8 @@ contract Governance {
         );
 
         Proposal storage proposal = proposals[proposalId];
+
+        // sets the proposal details
         proposal.creator = msg.sender;
         proposal.proposalQuestion = _proposalQuestion;
         proposal.proposalDescription = _proposalDescription;
@@ -142,17 +119,21 @@ contract Governance {
     )
         external
         onlyGovernanceTokenHolder
-        didntVoteBefore
-        proposalVotingIsActive
+        didntVoteBefore(proposalId, msg.sender)
+        proposalVotingIsActive(proposalId)
     {
+        Proposal storage proposal = proposals[proposalId];
         uint256 weight = getVotingWeight(msg.sender);
-        totalVotes += 1;
-        totalWeight += weight;
+
+        proposal.votes[msg.sender] = weight;
+
+        proposal.totalVotes += 1;
+        proposal.totalWeight += weight;
         if (support) {
-            proposal.supportForYes += weight;
+            proposal.totalWeightYes += weight;
             proposal.totalVotesYes += 1;
         } else {
-            proposal.supportForNo += weight;
+            proposal.totalWeightNo += weight;
             proposal.totalVotesNo += 1;
         }
         emit VoteCast(msg.sender, proposalId, support, weight);
@@ -164,44 +145,84 @@ contract Governance {
 
     function end(
         bytes32 proposalId
-    ) external onlyGovernanceTokenHolder proposalVotingIsEnded {
+    ) external onlyGovernanceTokenHolder proposalVotingIsEnded(proposalId) {
+
+        Proposal storage proposal = proposals[proposalId];
+
         bool beatsMinimumVotes = proposal.minimumVotes <=
             (proposal.totalVotesYes + proposal.totalVotesNo);
         bool beatsMinimumWeight = proposal.minimumWeight <=
             (proposal.totalWeightYes + proposal.totalWeightNo);
-        bool beatsQuorum = (proposal.totalWeightYes - proposal.totalWeightNo) /
-            (proposal.totalWeightYes + proposal.totalWeightNo) >
-            proposal.majorityRequiredToPass;
+        bool beatsQuorum = false;
+        uint256 totalWeight = proposal.totalWeightYes + proposal.totalWeightNo;
+        if (totalWeight > 0) {
+            uint256 yesPercentage = (proposal.totalWeightYes * 100) / totalWeight;
+            beatsQuorum = yesPercentage >= proposal.majorityRequiredToPass;
+        }
 
         if (!beatsMinimumVotes || !beatsMinimumWeight) {
             emit VoteEnded(
-                proposal.proposalId,
+                proposalId,
                 proposal.totalVotesYes,
                 proposal.totalWeightYes,
                 proposal.totalVotesNo,
                 proposal.totalWeightNo,
-                InsufficientVotersInterest
+                ProposalStatus.InsufficientVotersInterest
             );
         }
 
         if (!beatsQuorum) {
             emit VoteEnded(
-                proposal.proposalId,
+                proposalId,
                 proposal.totalVotesYes,
                 proposal.totalWeightYes,
                 proposal.totalVotesNo,
                 proposal.totalWeightNo,
-                No
+                ProposalStatus.NO
             );
         } else {
             emit VoteEnded(
-                proposal.proposalId,
+                proposalId,
                 proposal.totalVotesYes,
                 proposal.totalWeightYes,
                 proposal.totalVotesNo,
                 proposal.totalWeightNo,
-                Yes
+                ProposalStatus.YES
             );
         }
     }
 }
+
+// modifier surpassedMinimumVoteCount() {
+//     require(
+//         proposal.minimumVotes <=
+//             (proposal.totalVotesYes + proposal.totalVotesNo),
+//         "Proposal voting has ended"
+//     );
+//     _;
+// }
+// modifier surpassedMinimumVoteWeight() {
+//     require(
+//         proposal.minimumWeight <=
+//             (proposal.totalWeightYes + proposal.totalWeightNo),
+//         "Proposal voting has ended"
+//     );
+//     _;
+// }
+
+// modifier didntSurpassMinimumVoteCount() {
+//     require(
+//         proposal.minimumVotes >
+//             (proposal.totalVotesYes + proposal.totalVotesNo),
+//         "Proposal voting has ended"
+//     );
+//     _;
+// }
+// modifier didntSurpassMinimumVoteWeight() {
+//     require(
+//         proposal.minimumWeight >
+//             (proposal.totalWeightYes + proposal.totalWeightNo),
+//         "Proposal voting has ended"
+//     );
+//     _;
+// }
