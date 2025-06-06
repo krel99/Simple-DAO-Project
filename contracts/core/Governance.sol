@@ -186,9 +186,7 @@ contract Governance {
                 proposal.totalWeightNo,
                 ProposalStatus.InsufficientVotersInterest
             );
-        }
-
-        if (!beatsQuorum) {
+        } else if (!beatsQuorum) {
             emit VoteEnded(
                 proposalId,
                 proposal.totalVotesYes,
