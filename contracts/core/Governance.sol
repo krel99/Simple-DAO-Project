@@ -5,6 +5,7 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 
 contract Governance {
     address public governanceToken;
+    uint256 public nextProposalId = 1;
 
     struct Proposal {
         address creator;
@@ -31,8 +32,8 @@ contract Governance {
         InsufficientVotersInterest
     }
 
-    mapping(bytes32 => Proposal) public proposals;
-    bytes32[] public proposalIds;
+    mapping(uint256 => Proposal) public proposals;
+    uint256[] public proposalIds;
 
     // sets the governance token
     constructor(address _governanceToken) {
@@ -41,12 +42,12 @@ contract Governance {
 
     event VoteCast(
         address indexed voter,
-        bytes32 indexed proposalId,
+        uint256 indexed proposalId,
         bool support,
         uint256 weight
     );
     event VoteEnded(
-        bytes32 indexed proposalId,
+        uint256 indexed proposalId,
         uint256 totalVotesYes,
         uint256 totalWeightYes,
         uint256 totalVotesNo,
@@ -61,18 +62,18 @@ contract Governance {
         );
         _;
     }
-    modifier didntVoteBefore(bytes32 proposalId, address voter) {
+    modifier didntVoteBefore(uint256 proposalId, address voter) {
         require(proposals[proposalId].votes[voter] == 0, "Already voted");
         _;
     }
-    modifier proposalVotingIsActive(bytes32 proposalId) {
+    modifier proposalVotingIsActive(uint256 proposalId) {
         require(
             proposals[proposalId].deadline > block.timestamp,
             "Proposal voting is active"
         );
         _;
     }
-    modifier proposalVotingIsEnded(bytes32 proposalId) {
+    modifier proposalVotingIsEnded(uint256 proposalId) {
         require(
             proposals[proposalId].deadline < block.timestamp,
             "Proposal voting has ended"
@@ -80,7 +81,7 @@ contract Governance {
         _;
     }
 
-    modifier proposalExists(bytes32 proposalId) {
+    modifier proposalExists(uint256 proposalId) {
         require(
             proposals[proposalId].creator != address(0),
             "Proposal does not exist"
@@ -89,7 +90,6 @@ contract Governance {
     }
 
     function propose(
-        bytes32 proposalId,
         string memory _proposalQuestion,
         string memory _proposalDescription,
         uint64 _minimumVotes,
@@ -111,6 +111,7 @@ contract Governance {
             bytes(_proposalQuestion).length > 10,
             "Proposal question must be at least 10 characters long"
         );
+        uint256 proposalId = nextProposalId++;
 
         Proposal storage proposal = proposals[proposalId];
         proposalIds.push(proposalId);
@@ -132,7 +133,7 @@ contract Governance {
     }
 
     function vote(
-        bytes32 proposalId,
+        uint256 proposalId,
         bool support
     )
         external
@@ -164,13 +165,13 @@ contract Governance {
 
     function getVotingWeight(
         address voter,
-        bytes32 proposalId
+        uint256 proposalId
     ) public view returns (uint256) {
         return proposals[proposalId].snapshotBalances[voter];
     }
 
     function end(
-        bytes32 proposalId
+        uint256 proposalId
     ) external onlyGovernanceTokenHolder proposalVotingIsEnded(proposalId) {
         Proposal storage proposal = proposals[proposalId];
 
@@ -220,7 +221,7 @@ contract Governance {
     // these don't affect functionality or state
 
     // ? can this be written in a better way?
-    // function getProposal(bytes32 proposalId) public view returns (
+    // function getProposal(uint256 proposalId) public view returns (
     //     address creator,
     //     uint256 totalVotesYes,
     //     uint256 totalVotesNo,
@@ -254,7 +255,7 @@ contract Governance {
     // }
 
     function getProposalStatus(
-        bytes32 proposalId
+        uint256 proposalId
     ) public view returns (ProposalStatus) {
         Proposal storage proposal = proposals[proposalId];
 
@@ -281,26 +282,26 @@ contract Governance {
     }
 
     function hasVoted(
-        bytes32 proposalId,
+        uint256 proposalId,
         address voter
     ) public view returns (bool) {
         return proposals[proposalId].votes[voter] > 0;
     }
 
     function getVoteWeight(
-        bytes32 proposalId,
+        uint256 proposalId,
         address voter
     ) public view returns (uint256) {
         return proposals[proposalId].votes[voter];
     }
 
     function getRemainingTime(
-        bytes32 proposalId
+        uint256 proposalId
     ) public view returns (uint256) {
         return proposals[proposalId].deadline - block.timestamp;
     }
 
-    function getActiveProposals() public view returns (bytes32[] memory) {
+    function getActiveProposals() public view returns (uint256[] memory) {
         uint256 activeCount = 0;
         for (uint256 i = 0; i < proposalIds.length; i++) {
             if (proposals[proposalIds[i]].deadline > block.timestamp) {
@@ -308,7 +309,7 @@ contract Governance {
             }
         }
 
-        bytes32[] memory activeProposals = new bytes32[](activeCount);
+        uint256[] memory activeProposals = new uint256[](activeCount);
         uint256 count = 0;
         for (uint256 i = 0; i < proposalIds.length; i++) {
             if (proposals[proposalIds[i]].deadline > block.timestamp) {
@@ -321,7 +322,7 @@ contract Governance {
 
     function getProposalsByCreator(
         address creator
-    ) public view returns (bytes32[] memory) {
+    ) public view returns (uint256[] memory) {
         uint256 count = 0;
         for (uint256 i = 0; i < proposalIds.length; i++) {
             if (proposals[proposalIds[i]].creator == creator) {
@@ -329,7 +330,7 @@ contract Governance {
             }
         }
 
-        bytes32[] memory creatorProposals = new bytes32[](count);
+        uint256[] memory creatorProposals = new uint256[](count);
         uint256 index = 0;
         for (uint256 i = 0; i < proposalIds.length; i++) {
             if (proposals[proposalIds[i]].creator == creator) {
