@@ -21,6 +21,8 @@ contract Governance {
         uint256 totalWeight;
         uint256 totalVotes;
         mapping(address => uint256) votes;
+        mapping(address => uint256) snapshotBalances;
+        uint256 snapshotBlock;
     }
 
     enum ProposalStatus {
@@ -118,6 +120,7 @@ contract Governance {
             block.timestamp +
             (_durationInDays == 0 ? 60 : _durationInDays) *
             1 days;
+        proposal.snapshotBlock = block.number;
     }
 
     function vote(
@@ -130,7 +133,11 @@ contract Governance {
         proposalVotingIsActive(proposalId)
     {
         Proposal storage proposal = proposals[proposalId];
-        uint256 weight = getVotingWeight(msg.sender);
+        if (proposal.snapshotBalances[msg.sender] == 0) {
+            proposal.snapshotBalances[msg.sender] = IERC20(governanceToken)
+                .balanceOf(msg.sender);
+        }
+        uint256 weight = proposal.snapshotBalances[msg.sender];
 
         proposal.votes[msg.sender] = weight;
 
@@ -146,8 +153,11 @@ contract Governance {
         emit VoteCast(msg.sender, proposalId, support, weight);
     }
 
-    function getVotingWeight(address voter) public view returns (uint256) {
-        return IERC20(governanceToken).balanceOf(voter);
+    function getVotingWeight(
+        address voter,
+        bytes32 proposalId
+    ) public view returns (uint256) {
+        return proposals[proposalId].snapshotBalances[voter];
     }
 
     function end(
