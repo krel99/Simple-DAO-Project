@@ -80,6 +80,14 @@ contract Governance {
         _;
     }
 
+    modifier proposalExists(bytes32 proposalId) {
+        require(
+            proposals[proposalId].creator != address(0),
+            "Proposal does not exist"
+        );
+        _;
+    }
+
     function propose(
         bytes32 proposalId,
         string memory _proposalQuestion,
@@ -129,6 +137,7 @@ contract Governance {
     )
         external
         onlyGovernanceTokenHolder
+        proposalExists(proposalId)
         didntVoteBefore(proposalId, msg.sender)
         proposalVotingIsActive(proposalId)
     {
