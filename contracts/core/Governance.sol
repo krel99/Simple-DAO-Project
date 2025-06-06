@@ -37,7 +37,12 @@ contract Governance {
         governanceToken = _governanceToken;
     }
 
-    event VoteCast(address indexed voter, bytes32 indexed proposalId, bool support, uint256 weight);
+    event VoteCast(
+        address indexed voter,
+        bytes32 indexed proposalId,
+        bool support,
+        uint256 weight
+    );
     event VoteEnded(
         bytes32 indexed proposalId,
         uint256 totalVotesYes,
@@ -54,9 +59,9 @@ contract Governance {
         );
         _;
     }
-    modifier didntVoteBefore(bytes32 proposalId, address voter) { 
-        require(proposals[proposalId].votes[voter] == 0, "Already voted"); 
-        _; 
+    modifier didntVoteBefore(bytes32 proposalId, address voter) {
+        require(proposals[proposalId].votes[voter] == 0, "Already voted");
+        _;
     }
     modifier proposalVotingIsActive(bytes32 proposalId) {
         require(
@@ -104,8 +109,8 @@ contract Governance {
         proposal.creator = msg.sender;
         proposal.proposalQuestion = _proposalQuestion;
         proposal.proposalDescription = _proposalDescription;
-        proposal.minimumVotes = _minimumVotes;
-        proposal.minimumWeight = _minimumWeight;
+        proposal.minimumVotes = _minimumVotes == 0 ? 1 : _minimumVotes;
+        proposal.minimumWeight = _minimumWeight == 0 ? 1 : _minimumWeight;
         proposal.majorityRequiredToPass = _majorityRequiredToPass == 0
             ? 50
             : _majorityRequiredToPass;
@@ -148,7 +153,6 @@ contract Governance {
     function end(
         bytes32 proposalId
     ) external onlyGovernanceTokenHolder proposalVotingIsEnded(proposalId) {
-
         Proposal storage proposal = proposals[proposalId];
 
         bool beatsMinimumVotes = proposal.minimumVotes <=
@@ -158,7 +162,8 @@ contract Governance {
         bool beatsQuorum = false;
         uint256 totalWeight = proposal.totalWeightYes + proposal.totalWeightNo;
         if (totalWeight > 0) {
-            uint256 yesPercentage = (proposal.totalWeightYes * 100) / totalWeight;
+            uint256 yesPercentage = (proposal.totalWeightYes * 100) /
+                totalWeight;
             beatsQuorum = yesPercentage >= proposal.majorityRequiredToPass;
         }
 
@@ -193,7 +198,6 @@ contract Governance {
             );
         }
     }
-
 
     // view functions
     // these don't affect functionality or state
@@ -232,34 +236,50 @@ contract Governance {
     //     );
     // }
 
-    function getProposalStatus(bytes32 proposalId) public view returns (ProposalStatus) {
+    function getProposalStatus(
+        bytes32 proposalId
+    ) public view returns (ProposalStatus) {
         Proposal storage proposal = proposals[proposalId];
-        
-        bool beatsMinimumVotes = proposal.minimumVotes <= (proposal.totalVotesYes + proposal.totalVotesNo);
-        bool beatsMinimumWeight = proposal.minimumWeight <= (proposal.totalWeightYes + proposal.totalWeightNo);
-        
+
+        bool beatsMinimumVotes = proposal.minimumVotes <=
+            (proposal.totalVotesYes + proposal.totalVotesNo);
+        bool beatsMinimumWeight = proposal.minimumWeight <=
+            (proposal.totalWeightYes + proposal.totalWeightNo);
+
         if (!beatsMinimumVotes || !beatsMinimumWeight) {
             return ProposalStatus.InsufficientVotersInterest;
         }
-        
+
         uint256 totalWeight = proposal.totalWeightYes + proposal.totalWeightNo;
         if (totalWeight > 0) {
-            uint256 yesPercentage = (proposal.totalWeightYes * 100) / totalWeight;
-            return yesPercentage >= proposal.majorityRequiredToPass ? ProposalStatus.YES : ProposalStatus.NO;
+            uint256 yesPercentage = (proposal.totalWeightYes * 100) /
+                totalWeight;
+            return
+                yesPercentage >= proposal.majorityRequiredToPass
+                    ? ProposalStatus.YES
+                    : ProposalStatus.NO;
         }
-        
+
         return ProposalStatus.NO;
     }
 
-    function hasVoted(bytes32 proposalId, address voter) public view returns (bool) {
+    function hasVoted(
+        bytes32 proposalId,
+        address voter
+    ) public view returns (bool) {
         return proposals[proposalId].votes[voter] > 0;
     }
 
-    function getVoteWeight(bytes32 proposalId, address voter) public view returns (uint256) {
+    function getVoteWeight(
+        bytes32 proposalId,
+        address voter
+    ) public view returns (uint256) {
         return proposals[proposalId].votes[voter];
     }
 
-    function getRemainingTime(bytes32 proposalId) public view returns (uint256) {
+    function getRemainingTime(
+        bytes32 proposalId
+    ) public view returns (uint256) {
         return proposals[proposalId].deadline - block.timestamp;
     }
 
@@ -270,7 +290,7 @@ contract Governance {
                 activeCount++;
             }
         }
-        
+
         bytes32[] memory activeProposals = new bytes32[](activeCount);
         uint256 count = 0;
         for (uint256 i = 0; i < proposalIds.length; i++) {
@@ -282,14 +302,16 @@ contract Governance {
         return activeProposals;
     }
 
-    function getProposalsByCreator(address creator) public view returns (bytes32[] memory) {
+    function getProposalsByCreator(
+        address creator
+    ) public view returns (bytes32[] memory) {
         uint256 count = 0;
         for (uint256 i = 0; i < proposalIds.length; i++) {
             if (proposals[proposalIds[i]].creator == creator) {
                 count++;
             }
         }
-        
+
         bytes32[] memory creatorProposals = new bytes32[](count);
         uint256 index = 0;
         for (uint256 i = 0; i < proposalIds.length; i++) {
